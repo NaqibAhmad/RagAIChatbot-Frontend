@@ -1,7 +1,7 @@
 import { RAGRequest, RAGResponse } from '@/types';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
-
+console.log(API_BASE_URL);
 class ApiService {
   private async request<T>(
     endpoint: string,
