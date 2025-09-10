@@ -1,4 +1,5 @@
 import { RAGRequest, RAGResponse } from '@/types';
+import { licenseService } from '@/services/license';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 console.log(API_BASE_URL);
@@ -12,6 +13,7 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        [licenseService.headerName]: licenseService.getKey() || '',
         ...options.headers,
       },
       ...options,
@@ -21,6 +23,10 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          // License invalid or missing, clear it so UI re-gates
+          licenseService.clearKey();
+        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
@@ -94,9 +100,15 @@ class ApiService {
       const response = await fetch(url, {
         method: 'POST',
         body: formData,
+        headers: {
+          [licenseService.headerName]: licenseService.getKey() || '',
+        },
       });
       
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          licenseService.clearKey();
+        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }

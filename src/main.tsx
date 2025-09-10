@@ -1,12 +1,15 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import LicenseGate from '@/components/LicenseGate'
 import './index.css'
 import { Toaster } from 'react-hot-toast'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <LicenseGate>
+      <App />
+    </LicenseGate>
     <Toaster 
       position="top-right"
       toastOptions={{
