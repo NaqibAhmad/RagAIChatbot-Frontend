@@ -1,6 +1,22 @@
 import { RAGRequest, RAGResponse } from '@/types';
+import { licenseService } from './license';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+// Get API URL from environment variable, with fallback for production
+const getApiBaseUrl = () => {
+  const meta = import.meta as any;
+  const envUrl = meta.env?.VITE_API_URL;
+  if (envUrl) return envUrl;
+  
+  // In production (Vercel), use the backend URL
+  if (meta.env?.PROD) {
+    return 'https://ragaichatbot-backend.onrender.com';
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
   private async request<T>(
@@ -8,14 +24,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const licenseKey = localStorage.getItem('LICENSE_KEY') || '';
-    
-    // Debug logging (remove in production)
-    if (!licenseKey) {
-      console.warn('No license key found in localStorage. Make sure you have entered a license key.');
-    } else {
-      console.log('License key found, length:', licenseKey.length, 'First 10 chars:', licenseKey.substring(0, 10));
-    }
+    const licenseKey = licenseService.getKey() || '';
     
     // Build headers - ensure license key is always included if present
     const headers: Record<string, string> = {};
@@ -40,22 +49,33 @@ class ApiService {
       headers,
     };
 
-    // Log headers being sent (for debugging)
-    console.log('Request to:', url);
-    console.log('Request headers:', Object.keys(headers));
-
     try {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        // Handle 401 Unauthorized specifically
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Unauthorized: Please check your license key');
+        }
+        
+        // Handle other HTTP errors
         const errorData = await response.json().catch(() => ({}));
-        console.error('API error response:', errorData);
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
-      console.error('API request failed:', error);
+      // Handle CORS and network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        const corsError = new Error(
+          'Network error: Unable to connect to the server. This may be a CORS issue. Please check your backend configuration.'
+        );
+        (corsError as any).isCorsError = true;
+        throw corsError;
+      }
+      
+      // Re-throw other errors as-is
       throw error;
     }
   }
@@ -126,7 +146,7 @@ class ApiService {
     }
     
     const url = `${API_BASE_URL}/api/documents/upload`;
-    const licenseKey = localStorage.getItem('LICENSE_KEY') || '';
+    const licenseKey = licenseService.getKey() || '';
     
     try {
       const response = await fetch(url, {
