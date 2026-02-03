@@ -13,7 +13,7 @@ const getApiBaseUrl = () => {
   }
   
   // Default to localhost for development
-  return 'http://localhost:8000';
+  return 'https://ragaichatbot-backend.onrender.com';
 };
 
 const API_BASE_URL = getApiBaseUrl();
