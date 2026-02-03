@@ -140,28 +140,17 @@ const DocumentManager: React.FC = () => {
   };
 
   const deleteDocument = async (fileName: string) => {
-    if (window.confirm(`Are you sure you want to delete "${fileName}"?`)) {
+    if (window.confirm(`Are you sure you want to delete "${fileName}"? This will delete all chunks of this file across all sessions.`)) {
       try {
-        // Find the document to get its session ID
-        const document = databaseDocuments.find(doc => doc.file_name === fileName);
-        if (!document) {
-          toast.error('Document not found');
-          return;
-        }
-
-        // Delete from the first session (you might want to implement session-specific deletion)
-        const sessionId = document.sessions?.[0];
-        if (sessionId) {
-          await apiService.deleteSessionDocuments(sessionId);
-          toast.success(`${fileName} deleted successfully`);
-          // Refresh the documents list
-          await loadDatabaseDocuments();
-        } else {
-          toast.error('No session found for document');
-        }
-      } catch (error) {
+        // Delete by file name - this is more reliable than using session IDs
+        const response = await apiService.deleteDocumentsByFileName(fileName);
+        toast.success(`${fileName} deleted successfully (${response.deleted_count} chunks removed)`);
+        // Refresh the documents list
+        await loadDatabaseDocuments();
+      } catch (error: any) {
         console.error('Delete error:', error);
-        toast.error('Failed to delete document');
+        const errorMessage = error?.message || 'Failed to delete document';
+        toast.error(errorMessage);
       }
     }
   };

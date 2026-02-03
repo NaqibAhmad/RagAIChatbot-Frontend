@@ -1,19 +1,19 @@
 import { RAGRequest, RAGResponse } from '@/types';
-import { licenseService } from '@/services/license';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
-console.log(API_BASE_URL);
+
 class ApiService {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const licenseKey = localStorage.getItem('LICENSE_KEY') || '';
     
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        [licenseService.headerName]: licenseService.getKey() || '',
+        ...(licenseKey ? { 'X-License-Key': licenseKey } : {}),
         ...options.headers,
       },
       ...options,
@@ -23,10 +23,6 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          // License invalid or missing, clear it so UI re-gates
-          licenseService.clearKey();
-        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
@@ -80,8 +76,17 @@ class ApiService {
   }
 
   // Delete session documents
-  async deleteSessionDocuments(sessionId: string): Promise<{ message: string; documents_deleted: number; timestamp: string }> {
+  async deleteSessionDocuments(sessionId: string): Promise<{ message: string; deleted_count: number; timestamp: string }> {
     return this.request(`/api/documents/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Delete documents by file name
+  async deleteDocumentsByFileName(fileName: string): Promise<{ message: string; deleted_count: number; file_name: string; timestamp: string }> {
+    // Encode the file name in case it contains special characters
+    const encodedFileName = encodeURIComponent(fileName);
+    return this.request(`/api/documents/file/${encodedFileName}`, {
       method: 'DELETE',
     });
   }
@@ -95,20 +100,18 @@ class ApiService {
     }
     
     const url = `${API_BASE_URL}/api/documents/upload`;
+    const licenseKey = localStorage.getItem('LICENSE_KEY') || '';
     
     try {
       const response = await fetch(url, {
         method: 'POST',
         body: formData,
         headers: {
-          [licenseService.headerName]: licenseService.getKey() || '',
+          ...(licenseKey ? { 'X-License-Key': licenseKey } : {}),
         },
       });
       
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          licenseService.clearKey();
-        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
