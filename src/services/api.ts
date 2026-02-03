@@ -10,20 +10,46 @@ class ApiService {
     const url = `${API_BASE_URL}${endpoint}`;
     const licenseKey = localStorage.getItem('LICENSE_KEY') || '';
     
+    // Debug logging (remove in production)
+    if (!licenseKey) {
+      console.warn('No license key found in localStorage. Make sure you have entered a license key.');
+    } else {
+      console.log('License key found, length:', licenseKey.length, 'First 10 chars:', licenseKey.substring(0, 10));
+    }
+    
+    // Build headers - ensure license key is always included if present
+    const headers: Record<string, string> = {};
+    
+    // Copy existing headers if they're a plain object
+    if (options.headers && typeof options.headers === 'object' && !(options.headers instanceof Headers)) {
+      Object.assign(headers, options.headers);
+    }
+    
+    // Only add Content-Type if not already set (for FormData requests)
+    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    // Always add license key header if available
+    if (licenseKey) {
+      headers['X-License-Key'] = licenseKey;
+    }
+
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(licenseKey ? { 'X-License-Key': licenseKey } : {}),
-        ...options.headers,
-      },
       ...options,
+      headers,
     };
+
+    // Log headers being sent (for debugging)
+    console.log('Request to:', url);
+    console.log('Request headers:', Object.keys(headers));
 
     try {
       const response = await fetch(url, config);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('API error response:', errorData);
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
